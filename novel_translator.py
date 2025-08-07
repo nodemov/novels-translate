@@ -34,23 +34,61 @@ class NovelTranslator:
             
         return chunks
     
+    def clean_translation_output(self, text: str) -> str:
+        """ทำความสะอาดผลลัพธ์การแปลโดยลบส่วนที่ไม่ต้องการออก"""
+        # รายการคำหรือประโยคที่ต้องการลบออก
+        unwanted_phrases = [
+            "คุณคือนักแปลมืออาชีพ",
+            "กรุณาแปลเนื้อหาต่อไปนี้",
+            "หลักการแปล:",
+            "การแปล:",
+            "แปลเนื้อหาต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทย",
+            "รักษาความหมายและบรรยากาศ",
+            "ใช้ภาษาไทยที่อ่านง่าย",
+            "แปลศัพท์เฉพาะ:",
+            "คงชื่อตัวละคร",
+            "ปรับการใช้ภาษา",
+            "รักษาบุคลิกและสไตล์",
+            "1.", "2.", "3.", "4.", "5.", "6."
+        ]
+        
+        lines = text.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            # ข้ามบรรทัดว่างและบรรทัดที่มีคำที่ไม่ต้องการ
+            if not line:
+                continue
+            
+            # ตรวจสอบว่าบรรทัดนี้มีคำที่ไม่ต้องการหรือไม่
+            should_skip = False
+            for phrase in unwanted_phrases:
+                if phrase in line:
+                    should_skip = True
+                    break
+            
+            # ข้ามบรรทัดที่มีเฉพาะตัวเลขและจุด (เช่น "1.", "2.")
+            if line.strip() in ['1.', '2.', '3.', '4.', '5.', '6.']:
+                should_skip = True
+            
+            if not should_skip:
+                cleaned_lines.append(line)
+        
+        # รวมบรรทัดที่สะอาดแล้วและลบบรรทัดว่างที่ซ้ำ
+        result = '\n'.join(cleaned_lines)
+        
+        # ลบบรรทัดว่างที่ซ้ำกันออก
+        while '\n\n\n' in result:
+            result = result.replace('\n\n\n', '\n\n')
+        
+        return result.strip()
+    
     def translate_chunk(self, text: str) -> str:
         """แปลข้อความ chunk เดียว"""
-        prompt = f"""คุณคือนักแปลมืออาชีพที่มีความเชี่ยวชาญในการแปลนิยาย Wuxia/Xianxia จีนจากภาษาอังกฤษเป็นภาษาไทย
+        prompt = f"""แปลข้อความต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทยให้เป็นธรรมชาติและเหมาะสมกับนิยาย Wuxia/Xianxia โดยคงชื่อตัวละครและสถานที่ไว้:
 
-กรุณาแปลเนื้อหาต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทย:
-
-{text}
-
-หลักการแปล:
-1. รักษาความหมายและบรรยากาศของนิยาย Wuxia/Xianxia ไว้
-2. ใช้ภาษาไทยที่อ่านง่ายและไหลลื่น
-3. แปลศัพท์เฉพาะ: Cultivation→การเพาะพิถี, Qi→ชี่, Dantian→ต้านเถียน, Breakthrough→ก้าวกระโดด, Elder→ผู้อาวุโส, Young Master→คุณชายหนุ่ม
-4. คงชื่อตัวละครและสถานที่เฉพาะไว้
-5. ปรับการใช้ภาษาให้เหมาะสมกับผู้อ่านไทย
-6. รักษาบุคลิกและสไตล์การพูดของตัวละครไว้
-
-การแปล:"""
+{text}"""
 
         payload = {
             "model": self.model_name,
@@ -72,7 +110,9 @@ class NovelTranslator:
             result = response.json()
             
             if 'response' in result:
-                return result['response'].strip()
+                # ทำความสะอาดผลลัพธ์การแปลก่อนส่งคืน
+                cleaned_result = self.clean_translation_output(result['response'])
+                return cleaned_result
             else:
                 print(f"ข้อผิดพลาด: ไม่พบ response ใน result")
                 return text
